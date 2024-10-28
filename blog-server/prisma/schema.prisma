@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  BUSINESS_PARTNER
+  CUSTOMER
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+model User {
+  id                       String          @id @default(uuid())
+  email                    String?         @unique
+  emailVerified            Boolean         @default(false)
+  emailVerificationExpires DateTime? //24h
+  emailVerificationToken   String?         @unique
+  password                 String?
+  passwordResetToken       String?         @unique
+  passwordResetExpires     DateTime? //4h
+  role                     UserRole        @default(CUSTOMER)
+  status                   UserStatus      @default(ACTIVE)
+  reActiveToken            String?         @unique
+  reActiveExpires          DateTime? //4h
+  fullName                 String?
+  birthDate                String?
+  gender                   Gender?
+  picture                  String?
+  phoneNumber              String?
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+  oauthProviders           OauthProvider[]
+  mfa                      MFA?
+  TaskAssignees            TaskAssignees[]
+  Task                     Task[]
+
+  @@index([email, emailVerificationToken, passwordResetToken, reActiveToken])
+}
+
+// model Address {
+//   id          String  @id @default(uuid())
+//   phoneNumber String
+//   address     String
+//   idDefault   Boolean
+//   userId      String
+//   user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+// }
+
+model OauthProvider {
+  providerId String
+  provider   String
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@id([userId, provider])
+  @@unique([provider, providerId])
+}
+
+model MFA {
+  secretKey       String
+  lastAccess      DateTime @updatedAt
+  backupCodes     String[]
+  backupCodesUsed String[] @default([])
+  userId          String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId])
+  @@index([backupCodes, backupCodesUsed])
+}
+
+enum TaskStatus {
+  TO_DO
+  ON_PROGRESS
+  IN_REVIEW
+  COMPLETED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model TaskAssignees {
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@id([userId, taskId])
+}
+
+model TagTask {
+  name      String      @unique
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  taskToTag TaskToTag[]
+
+  @@id([name])
+  @@index([name])
+}
+
+model TaskToTag {
+  taskId  String
+  task    Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tagName String
+  tag     TagTask @relation(fields: [tagName], references: [name], onDelete: Cascade)
+
+  @@id([taskId, tagName])
+  @@index([taskId, tagName])
+}
+
+model Task {
+  id                String          @id @default(uuid())
+  name              String
+  description       String
+  status            TaskStatus      @default(TO_DO)
+  tags              TaskToTag[]
+  startDate         DateTime
+  dueDate           DateTime
+  priority          TaskPriority
+  createdBy         User            @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdById       String
+  subTasks          SubTask[]
+  taskAssignees     TaskAssignees[]
+  disableAttachment Boolean
+  closeTask         Boolean         @default(false)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  taskSubmit        TaskSubmit[]
+
+  @@index([name, status, startDate, dueDate, priority, createdById])
+}
+
+model SubTask {
+  id                String       @id @default(uuid())
+  subTaskName       String       @default("")
+  disableAttachment Boolean      @default(true)
+  parentTask        Task         @relation(fields: [parentTaskId], references: [id], onDelete: Cascade)
+  parentTaskId      String
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  taskSubmit        TaskSubmit[]
+
+  @@index([subTaskName, parentTaskId])
+}
+
+enum TaskSubmitStatus {
+  ASSIGNED
+  ACCEPTED
+  REJECTED
+}
+
+model TaskSubmit {
+  id           String           @id @default(uuid())
+  taskId       String
+  task         Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  subTask      SubTask?         @relation(fields: [subTaskId], references: [id], onDelete: Cascade)
+  subTaskId    String?
+  status       TaskSubmitStatus @default(ASSIGNED)
+  attachments  String[]         @default([])
+  comments     String           @default("")
+  taskSubmitAt DateTime         @default(now())
+
+  @@index([taskId, subTaskId, status, taskSubmitAt])
+}
+
+model TaskAttachment {
+  id       String @id @default(uuid())
+  fileName String
+  type     String
+  url      String
+
+  @@index([fileName, url, type])
+}
