@@ -25,6 +25,17 @@ export const createTaskSchema = z.object({
         required_error: "description is required",
         invalid_type_error: "description must be string",
       }),
+      taskAssignees: z
+        .array(
+          z.string({
+            invalid_type_error: "taskAssignee must be string",
+          }),
+          {
+            required_error: "taskAssignees is required",
+            invalid_type_error: "taskAssignees must be array",
+          }
+        )
+        .nonempty(),
       status: z.enum(taskStatus),
       tags: z
         .array(z.string({ invalid_type_error: "tag[] must be string" }), {
