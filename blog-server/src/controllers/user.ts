@@ -1,7 +1,9 @@
 import config from "@/config";
 import { BadRequestError } from "@/error-handler";
 import { sendEmailProducer } from "@/rabbit/send-email";
+import { deleteSessionByKey, getAllSession } from "@/redis/session";
 import { saveUserCacheByToken } from "@/redis/user.cache";
+import { editUserById } from "@/services/user";
 import { randId } from "@/utils/helper";
 import { signJWT } from "@/utils/jwt";
 import { emaiEnum } from "@/utils/nodemailer";
@@ -48,5 +50,51 @@ export async function sendConfirmEmail(req: Request, res: Response) {
 
   return res.status(StatusCodes.OK).json({
     message: "Đã gửi lại email xác minh",
+  });
+}
+
+export async function signOut(req: Request, res: Response) {
+  if (req.sessionKey) await deleteSessionByKey(req.sessionKey);
+  res
+    .status(StatusCodes.OK)
+    .clearCookie(config.SESSION_KEY_NAME)
+    .json({
+      message: "Đăng xuất thành công",
+    })
+    .end();
+}
+
+export async function readAllSession(req: Request, res: Response) {
+  const { id } = req.user!;
+  const sessions = await getAllSession(id);
+  res.status(StatusCodes.OK).json(sessions);
+}
+
+export async function removeSession(
+  req: Request<{ sessionId: string }>,
+  res: Response
+) {
+  const { id } = req.user!;
+
+  if (req.sessionData!.id == req.params.sessionId)
+    throw new BadRequestError("Không thể xoá phiên hiện tại");
+  await deleteSessionByKey(
+    `${config.SESSION_KEY_NAME}:${id}:${req.params.sessionId}`
+  );
+  res.status(StatusCodes.OK).json({
+    message: "Xoá phiên thành công",
+  });
+}
+
+export async function disactivate(
+  req: Request<{ sessionId: string }>,
+  res: Response
+) {
+  const { id } = req.user!;
+  await editUserById(id, {
+    status: "SUSPENDED",
+  });
+  res.status(StatusCodes.OK).clearCookie(config.SESSION_KEY_NAME).json({
+    message: "Your account has been disabled. You can reactivate at any time!",
   });
 }

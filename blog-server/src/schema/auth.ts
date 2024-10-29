@@ -44,14 +44,14 @@ export const signInSchema = z.object({
           required_error: "Email là trường bắt buộc",
           invalid_type_error: "Email phải là chuỗi",
         })
-        .email("Email hay mật khẩu không đúng"),
+        .email("Email và mật khẩu không hợp lệ"),
       password: z
         .string({
           required_error: "Mật khẩu là trường bắt buộc",
           invalid_type_error: "Mật khẩu phải là chuỗi",
         })
-        .min(8, "Email hay mật khẩu không đúng")
-        .max(40, "Email hay mật khẩu không đúng"),
+        .min(8, "Email và mật khẩu không hợp lệ")
+        .max(40, "Email và mật khẩu không hợp lệ"),
     })
     .strict(),
 });
@@ -61,23 +61,49 @@ export const recoverSchema = z.object({
     .object({
       email: z
         .string({
-          required_error: "Email is required",
-          invalid_type_error: "Email must be string",
+          required_error: "Email là trường bắt buộc",
+          invalid_type_error: "Email phải là chuỗi",
         })
-        .email("Invalid email address"),
+        .email("Email không hợp lệ"),
     })
     .strict(),
 });
 
 export const resetPasswordSchema = z.object({
+  query: z.object({
+    token: z.union([z.string(), z.array(z.string())]).optional(),
+  }),
+  body: z
+    .object({
+      password: z
+        .string({
+          required_error: "Mật khẩu là bắt buộc",
+          invalid_type_error: "Mật khẩu phải là chuỗi",
+        })
+        .min(8, "Mật khẩu quá ngắn")
+        .max(40, "Mật khẩu quá dài")
+        .regex(
+          /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]*$/,
+          "Mật khẩu phải có ký tự hoa, thường, sô và ký tự đặc biệt"
+        ),
+      confirmPassword: z.string(),
+    })
+    .strict()
+    .refine((data) => data.password === data.confirmPassword, {
+      message: "Xác nhận mật khẩu không khớp",
+      path: ["confirmPassword"],
+    }),
+});
+
+export const sendReActivateAccountSchema = z.object({
   body: z
     .object({
       email: z
         .string({
-          required_error: "Email is required",
-          invalid_type_error: "Email must be string",
+          required_error: "Email là trường bắt buộc",
+          invalid_type_error: "Email phải là chuỗi",
         })
-        .email("Invalid email address"),
+        .email("Email không hợp lệ"),
     })
     .strict(),
 });
@@ -86,3 +112,6 @@ export type SignUpReq = z.infer<typeof signUpSchema>;
 export type SignInReq = z.infer<typeof signInSchema>;
 export type RecoverReq = z.infer<typeof recoverSchema>;
 export type ResetPasswordReq = z.infer<typeof resetPasswordSchema>;
+export type SendReActivateAccountReq = z.infer<
+  typeof sendReActivateAccountSchema
+>;

@@ -48,6 +48,7 @@ app.use(
     if (error instanceof CustomError) {
       return res.status(error.statusCode).json(error.serializeErrors());
     }
+    console.log(error);
     return res
       .status(StatusCodes.INTERNAL_SERVER_ERROR)
       .send({ message: "Something went wrong" });

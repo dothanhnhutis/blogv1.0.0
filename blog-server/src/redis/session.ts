@@ -68,7 +68,25 @@ export async function getSessionByKey(sessionKey: string) {
   }
 }
 
-export const sessionLastAccess = async (sessionKey: string) => {
+export async function getAllSession(userId: string) {
+  try {
+    const keys = await redisClient.keys(
+      `${config.SESSION_KEY_NAME}:${userId}:*`
+    );
+    const data: SessionData[] = [];
+    for (const id of keys) {
+      const session = await getSessionByKey(id);
+      if (!session) continue;
+      data.push(session);
+    }
+    return data;
+  } catch (error: unknown) {
+    console.log(`getAllSession() method error: `, error);
+    return [];
+  }
+}
+
+export async function sessionLastAccess(sessionKey: string) {
   const sessionCache = await redisClient.get(sessionKey);
 
   if (sessionCache == null) return;
@@ -89,4 +107,23 @@ export const sessionLastAccess = async (sessionKey: string) => {
   } catch (error: any) {
     console.log(`SessionLastAccess() method error: `, error);
   }
-};
+}
+
+export async function deleteSessionByKey(sessionKey: string) {
+  try {
+    await redisClient.del(sessionKey);
+  } catch (error) {
+    console.log(`deleteSessionByKey() method error: `, error);
+  }
+}
+
+export async function deleteSessions(userId: string) {
+  try {
+    const keys = await redisClient.keys(
+      `${config.SESSION_KEY_NAME}:${userId}:*`
+    );
+    await Promise.all(keys.map(async (key) => redisClient.del(key)));
+  } catch (error) {
+    console.log(`deleteSessions() method error: `, error);
+  }
+}

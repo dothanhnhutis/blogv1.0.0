@@ -5,6 +5,7 @@ import { BadRequestError, NotFoundError } from "@/error-handler";
 import {
   RecoverReq,
   ResetPasswordReq,
+  SendReActivateAccountReq,
   SignInReq,
   SignUpReq,
 } from "@/schema/auth";
@@ -20,6 +21,8 @@ import { compareData, encrypt, randId } from "@/utils/helper";
 import { createSession } from "@/redis/session";
 import { sendEmailProducer } from "@/rabbit/send-email";
 import { emaiEnum } from "@/utils/nodemailer";
+import { saveUserCacheByToken } from "@/redis/user.cache";
+import { UserToken } from "@/schema/user";
 
 export async function signUp(
   req: Request<{}, {}, SignUpReq["body"]>,
@@ -43,18 +46,18 @@ export async function confirmEmail(
   const { token } = req.query;
   if (typeof token != "string") throw new NotFoundError();
 
-  const tokenVerify = verifyJWT<{
-    type: "emailVerification" | "recoverAccount" | "reActivate";
-    session: string;
-  }>(token, config.JWT_SECRET);
+  const tokenVerify = verifyJWT<UserToken>(token, config.JWT_SECRET);
 
-  if (!tokenVerify) throw new NotFoundError();
+  if (!tokenVerify || tokenVerify.type != "emailVerification")
+    throw new BadRequestError("Phiên của bạn đã hết hạn.");
 
   const user = await getUserByToken(tokenVerify);
-  if (!user) throw new NotFoundError();
+  if (!user) throw new BadRequestError("Phiên của bạn đã hết hạn.");
 
   await editUserById(user.id, {
     emailVerified: true,
+    emailVerificationToken: null,
+    emailVerificationExpires: new Date(),
   });
 
   return res.status(StatusCodes.OK).json({
@@ -70,7 +73,7 @@ export async function signIn(
   const user = await getUserByEmail(email);
 
   if (!user || !user.password || !(await compareData(user.password, password)))
-    throw new BadRequestError("Email hoặc mật khẩu không hợp lệ.");
+    throw new BadRequestError("Email và mật khẩu không hợp lệ.");
 
   if (user.status == "SUSPENDED")
     throw new BadRequestError(
@@ -117,34 +120,15 @@ export async function recover(
   res: Response
 ) {
   const { email } = req.body;
-  const existingUser = await getUserByEmail(email);
-  if (!existingUser) throw new BadRequestError("Email không tồn tại");
+  const user = await getUserByEmail(email);
+  if (!user) throw new BadRequestError("Email không tồn tại");
 
-  const expires: Date = new Date(Date.now() + 4 * 60 * 60000);
+  const expires: number = Math.floor((Date.now() + 4 * 60 * 60 * 1000) / 1000);
   const session = await randId();
 
-  await editUserById(existingUser.id, {
+  await editUserById(user.id, {
     passwordResetToken: session,
-    passwordResetExpires: expires,
-  });
-
-  const token = signJWT(
-    {
-      type: "recoverAccount",
-      session,
-      iat: Math.floor(expires.getTime() / 1000),
-    },
-    config.JWT_SECRET
-  );
-  const recoverLink = `${config.CLIENT_URL}/reset-password?token=${token}`;
-
-  await sendEmailProducer({
-    template: emaiEnum.RECOVER_ACCOUNT,
-    receiver: email,
-    locals: {
-      username: existingUser.fullName!,
-      recoverLink,
-    },
+    passwordResetExpires: new Date(expires * 1000),
   });
 
   return res.status(StatusCodes.OK).send({
@@ -153,6 +137,80 @@ export async function recover(
 }
 
 export async function resetPassword(
-  req: Request<{}, {}, ResetPasswordReq["body"]>,
+  req: Request<{}, {}, ResetPasswordReq["body"], ResetPasswordReq["query"]>,
   res: Response
-) {}
+) {
+  const { token } = req.query;
+
+  if (typeof token != "string") throw new NotFoundError();
+
+  const tokenVerify = verifyJWT<UserToken>(token, config.JWT_SECRET);
+
+  if (!tokenVerify || tokenVerify.type != "recover")
+    throw new BadRequestError("Phiên của bạn đã hết hạn.");
+
+  const { password } = req.body;
+
+  const user = await getUserByToken(tokenVerify);
+  if (!user) throw new BadRequestError("Phiên của bạn đã hết hạn.");
+
+  await editUserById(user.id, {
+    password,
+    passwordResetExpires: new Date(),
+    passwordResetToken: null,
+  });
+
+  return res.status(StatusCodes.OK).send({
+    message: "Đặt lại mật khẩu thành công",
+  });
+}
+
+export async function sendReactivateAccount(
+  req: Request<{}, {}, SendReActivateAccountReq["body"]>,
+  res: Response
+) {
+  const { email } = req.body;
+  const user = await getUserByEmail(email);
+  if (!user) throw new BadRequestError("Email không tồn tại");
+  if (user.status == "ACTIVE")
+    throw new BadRequestError("Tài khoản của bạn đang hoạt động");
+  if (user.status == "DISABLED")
+    throw new BadRequestError("Tài khoản của bạn đã bị vô hiệu hoá vĩnh viễn");
+
+  const expires: number = Math.floor((Date.now() + 4 * 60 * 60 * 1000) / 1000);
+  const session = await randId();
+
+  await editUserById(user.id, {
+    reActiveToken: session,
+    reActiveExpires: new Date(expires * 1000),
+  });
+
+  return res.status(StatusCodes.OK).send({
+    message: "Gửi email thành công",
+  });
+}
+
+export async function reActivateAccount(
+  req: Request<{}, {}, {}, { token?: string | string[] | undefined }>,
+  res: Response
+) {
+  const { token } = req.query;
+  if (typeof token != "string") throw new NotFoundError();
+
+  const tokenVerify = verifyJWT<UserToken>(token, config.JWT_SECRET);
+
+  if (!tokenVerify || tokenVerify.type != "reActivate")
+    throw new BadRequestError("Phiên của bạn đã hết hạn");
+  console.log(tokenVerify);
+  const user = await getUserByToken(tokenVerify);
+  if (!user) throw new BadRequestError("Phiên của bạn đã hết hạn");
+  await editUserById(user.id, {
+    status: "ACTIVE",
+    reActiveExpires: new Date(),
+    reActiveToken: null,
+  });
+
+  return res.status(StatusCodes.OK).send({
+    message: "Tài khoản đã được kích hoạt",
+  });
+}

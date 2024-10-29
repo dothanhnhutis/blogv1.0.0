@@ -1,5 +1,6 @@
 import config from "@/config";
 import { sendEmailProducer } from "@/rabbit/send-email";
+import { deleteSessions } from "@/redis/session";
 import {
   getUserCacheByEmail,
   getUserCacheById,
@@ -94,7 +95,7 @@ export async function getUserByToken(token: UserToken) {
       },
       select: userSelectDefault,
     });
-  } else if (token.type == "recoverAccount") {
+  } else if (token.type == "recover") {
     user = await prisma.user.findUnique({
       where: {
         passwordResetToken: token.session,
@@ -126,7 +127,7 @@ export async function insertUserWithPassword({
     {
       type: "emailVerification",
       session,
-      iat: expires,
+      exp: expires,
     },
     config.JWT_SECRET
   );
@@ -167,10 +168,15 @@ export async function editUserById(
   input: {
     fullName?: string;
     emailVerified?: boolean;
+    emailVerificationToken?: string | null;
+    emailVerificationExpires?: Date;
     email?: string;
     password?: string;
-    passwordResetToken?: string;
+    passwordResetToken?: string | null;
     passwordResetExpires?: Date;
+    status?: User["status"];
+    reActiveToken?: string | null;
+    reActiveExpires?: Date;
   }
 ) {
   let data: Prisma.UserUpdateInput = {
@@ -182,10 +188,58 @@ export async function editUserById(
     data.password = hashData(input.password);
   }
 
-  if (input.emailVerified) {
-    data.emailVerified = true;
-    data.emailVerificationToken = null;
-    data.emailVerificationExpires = new Date();
+  if (input.passwordResetExpires && input.passwordResetToken) {
+    const token = signJWT(
+      {
+        type: "recover",
+        session: input.passwordResetToken,
+        iat: input.passwordResetExpires.getTime() / 1000,
+      },
+      config.JWT_SECRET
+    );
+    const recoverLink = `${config.CLIENT_URL}/reset-password?token=${token}`;
+
+    await saveUserCacheByToken(
+      { type: "recover", session: input.passwordResetToken },
+      userId,
+      input.passwordResetExpires.getTime() - Date.now()
+    );
+
+    await sendEmailProducer({
+      template: emaiEnum.RECOVER_ACCOUNT,
+      receiver: user!.email,
+      locals: {
+        username: user!.fullName,
+        recoverLink,
+      },
+    });
+  }
+
+  if (input.reActiveToken && input.reActiveExpires) {
+    const token = signJWT(
+      {
+        type: "reActivate",
+        session: input.reActiveToken,
+        iat: input.reActiveExpires.getTime() / 1000,
+      },
+      config.JWT_SECRET
+    );
+    const recoverLink = `${config.CLIENT_URL}/reactivate?token=${token}`;
+
+    await saveUserCacheByToken(
+      { type: "reActivate", session: input.reActiveToken },
+      userId,
+      input.reActiveExpires.getTime() - Date.now()
+    );
+
+    await sendEmailProducer({
+      template: emaiEnum.RECOVER_ACCOUNT,
+      receiver: user!.email,
+      locals: {
+        username: user!.fullName,
+        recoverLink,
+      },
+    });
   }
 
   if (input.email) {
@@ -216,6 +270,10 @@ export async function editUserById(
     });
   }
 
+  if (input.status && input.status != "ACTIVE") {
+    await deleteSessions(userId);
+  }
+
   const newUser = await prisma.user.update({
     where: {
       id: userId,
@@ -223,6 +281,7 @@ export async function editUserById(
     data,
     select: userSelectDefault,
   });
+
   await saveUserCache(newUser);
 
   return newUser;

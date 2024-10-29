@@ -40,6 +40,6 @@ export type User = {
 };
 
 export type UserToken = {
-  type: "emailVerification" | "recoverAccount" | "reActivate";
+  type: "emailVerification" | "recover" | "reActivate";
   session: string;
 };

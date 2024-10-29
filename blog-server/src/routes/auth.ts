@@ -2,14 +2,17 @@ import express, { type Router } from "express";
 import validateResource from "@/middleware/validateResource";
 import {
   confirmEmail,
+  reActivateAccount,
   recover,
   resetPassword,
+  sendReactivateAccount,
   signIn,
   signUp,
 } from "@/controllers/auth";
 import {
   recoverSchema,
   resetPasswordSchema,
+  sendReActivateAccountSchema,
   signInSchema,
   signUpSchema,
 } from "@/schema/auth";
@@ -18,6 +21,8 @@ import { rateLimitEmail } from "@/middleware/rateLimit";
 const router: Router = express.Router();
 function authRouter(): Router {
   router.get("/auth/confirm-email", confirmEmail);
+  router.get("/auth/reactivate", reActivateAccount);
+
   router.post("/auth/signup", validateResource(signUpSchema), signUp);
   router.post("/auth/signin", validateResource(signInSchema), signIn);
   router.post(
@@ -27,10 +32,10 @@ function authRouter(): Router {
     recover
   );
   router.post(
-    "/auth/recover",
+    "/auth/reactivate",
     rateLimitEmail,
-    validateResource(recoverSchema),
-    recover
+    validateResource(sendReActivateAccountSchema),
+    sendReactivateAccount
   );
 
   router.post(

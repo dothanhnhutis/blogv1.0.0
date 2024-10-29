@@ -5,7 +5,7 @@ export async function getUserCacheByEmail(email: string) {
   try {
     const id = await redisClient.get(`user:email:${email}`);
     if (!id) return;
-    const userCache = await redisClient.get(`user:id:${id}`);
+    const userCache = await redisClient.get(`user:${id}`);
     if (!userCache) {
       await redisClient.del(`user:email:${email}`);
       return;
@@ -19,7 +19,7 @@ export async function getUserCacheByEmail(email: string) {
 
 export async function getUserCacheById(id: string) {
   try {
-    const userCache = await redisClient.get(`user:id:${id}`);
+    const userCache = await redisClient.get(`user:${id}`);
     if (!userCache) {
       return;
     }
