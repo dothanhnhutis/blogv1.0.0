@@ -1,5 +1,5 @@
-import { Server } from "socket.io";
-import { createSocketIO, socketIO } from "./init";
+import { Server, Socket } from "socket.io";
+import SocketServer from "./init";
 
 export const taskListener = (io: Server) => {
   const factoryNamespace = io.of("/task");
@@ -19,6 +19,7 @@ export const taskListener = (io: Server) => {
 };
 
 export const taskSend = (data: any) => {
-  const factoryNamespace = socketIO.of("/task");
+  const factoryNamespace = SocketServer.io.of("/task");
+  SocketServer.io;
   factoryNamespace.emit("message", data);
 };

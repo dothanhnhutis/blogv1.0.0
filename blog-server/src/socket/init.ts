@@ -1,16 +1,26 @@
 import config from "@/config";
-import { Server } from "socket.io";
+import { Server, ServerOptions } from "socket.io";
 import http from "http";
 
-export let socketIO: Server;
-
-export const createSocketIO = (httpServer: http.Server) => {
-  const io = new Server(httpServer, {
-    cors: {
-      origin: `${config.CLIENT_URL}`,
-      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    },
-  });
-  socketIO = io;
-  return io;
+const opt: Partial<ServerOptions> = {
+  cors: {
+    origin: `${config.CLIENT_URL}`,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  },
 };
+
+class SocketServer extends Server {
+  private static io: SocketServer;
+
+  constructor(httpServer: http.Server) {
+    super(httpServer, opt);
+  }
+
+  public static createInstance(httpServer: http.Server): SocketServer {
+    if (!SocketServer.io) {
+      SocketServer.io = new SocketServer(httpServer);
+    }
+    return SocketServer.io;
+  }
+}
+export default SocketServer;

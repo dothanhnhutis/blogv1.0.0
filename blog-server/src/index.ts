@@ -3,7 +3,7 @@ import app from "@/app";
 import { initRedis } from "@/redis/connection";
 import { Server } from "socket.io";
 import { taskListener } from "./socket/task";
-import { createSocketIO } from "./socket/init";
+import SocketServer from "./socket/init";
 
 const SERVER_PORT = 4000;
 
@@ -22,7 +22,7 @@ const startHttpServer = (httpServer: http.Server) => {
 const startServer = () => {
   try {
     const httpServer: http.Server = new http.Server(app);
-    const socketIO: Server = createSocketIO(httpServer);
+    const socketIO: Server = SocketServer.createInstance(httpServer);
     taskListener(socketIO);
     startHttpServer(httpServer);
   } catch (error) {
