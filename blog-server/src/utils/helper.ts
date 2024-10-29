@@ -38,33 +38,38 @@ export function encrypt(text: string, secret: string) {
 }
 
 export function decrypt(encrypted: string, secret: string) {
-  const secretValidate = z
-    .string()
-    .refine(
-      (key) => {
-        const keyBuffer = Buffer.from(key, "base64");
-        return keyBuffer.length === 32; // Kiểm tra độ dài 32 byte
-      },
-      {
-        message:
-          "The secret key must be 32 bytes long when decoded from base64.",
-      }
-    )
-    .safeParse(secret);
-  if (!secretValidate.success) {
-    // throw new Error(secretValidate.error.issues[0].message);
+  try {
+    const secretValidate = z
+      .string()
+      .refine(
+        (key) => {
+          const keyBuffer = Buffer.from(key, "base64");
+          return keyBuffer.length === 32; // Kiểm tra độ dài 32 byte
+        },
+        {
+          message:
+            "The secret key must be 32 bytes long when decoded from base64.",
+        }
+      )
+      .safeParse(secret);
+    if (!secretValidate.success) {
+      // throw new Error(secretValidate.error.issues[0].message);
+      return;
+    }
+    const parts = encrypted.split(".");
+    const iv = Buffer.from(parts[0], "hex");
+    const decipher = crypto.createDecipheriv(
+      "aes-256-cbc",
+      Buffer.from(secretValidate.data, "base64"),
+      iv
+    );
+    const decrypted =
+      decipher.update(parts[1], "hex", "utf8") + decipher.final("utf8");
+    return decrypted;
+  } catch (error: unknown) {
+    console.log(error);
     return;
   }
-  const parts = encrypted.split(".");
-  const iv = Buffer.from(parts[0], "hex");
-  const decipher = crypto.createDecipheriv(
-    "aes-256-cbc",
-    Buffer.from(secretValidate.data, "base64"),
-    iv
-  );
-  const decrypted =
-    decipher.update(parts[1], "hex", "utf8") + decipher.final("utf8");
-  return decrypted;
 }
 
 export async function randId() {

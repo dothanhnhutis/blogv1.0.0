@@ -12,7 +12,7 @@ import { User, UserToken } from "@/schema/user";
 import prisma from "@/utils/db";
 import { hashData, randId } from "@/utils/helper";
 import { signJWT } from "@/utils/jwt";
-import { emaiEnum } from "@/utils/nodemailer";
+import { emaiEnum, sendMail } from "@/utils/nodemailer";
 import { Prisma } from "@prisma/client";
 
 export const userSelectDefault = {
@@ -76,7 +76,8 @@ export async function getUserById(id: string) {
     },
     select: userSelectDefault,
   });
-  if (user) await saveUserCache(user);
+  if (!user) return;
+  await saveUserCache(user);
   return user;
 }
 
@@ -111,7 +112,6 @@ export async function getUserByToken(token: UserToken) {
     });
   }
   if (!user) return;
-
   await saveUserCache(user);
   return user;
 }
@@ -160,4 +160,70 @@ export async function insertUserWithPassword({
   });
 
   return user;
+}
+
+export async function editUserById(
+  userId: string,
+  input: {
+    fullName?: string;
+    emailVerified?: boolean;
+    email?: string;
+    password?: string;
+    passwordResetToken?: string;
+    passwordResetExpires?: Date;
+  }
+) {
+  let data: Prisma.UserUpdateInput = {
+    ...input,
+  };
+  const user = await getUserCacheById(userId);
+
+  if (input.password) {
+    data.password = hashData(input.password);
+  }
+
+  if (input.emailVerified) {
+    data.emailVerified = true;
+    data.emailVerificationToken = null;
+    data.emailVerificationExpires = new Date();
+  }
+
+  if (input.email) {
+    const expires: number = Math.floor(
+      (Date.now() + 4 * 60 * 60 * 1000) / 1000
+    );
+    const session = await randId();
+    const token = signJWT(
+      {
+        type: "emailVerification",
+        session,
+        iat: expires,
+      },
+      config.JWT_SECRET
+    );
+    await saveUserCacheByToken(
+      { type: "emailVerification", session },
+      userId,
+      expires
+    );
+    await sendMail({
+      template: emaiEnum.VERIFY_EMAIL,
+      receiver: input.email,
+      locals: {
+        username: input.fullName || user!.fullName || "",
+        verificationLink: config.CLIENT_URL + "/confirm-email?token=" + token,
+      },
+    });
+  }
+
+  const newUser = await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data,
+    select: userSelectDefault,
+  });
+  await saveUserCache(newUser);
+
+  return newUser;
 }

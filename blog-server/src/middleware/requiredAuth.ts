@@ -17,15 +17,15 @@ export const authMiddleware =
     };
 
     if (newProps.emailVerified && !req.user.emailVerified) {
-      throw new PermissionError("Your email hasn't been verified");
+      throw new PermissionError("Tài khoản của bạn chưa xác thực");
     }
 
     if (req.user.status == "SUSPENDED") {
-      throw new PermissionError("Your account has been suspended.");
+      throw new PermissionError("Tài khoản của bạn vị vô hiệu hoá tạm thời");
     }
     if (req.user.status == "DISABLED") {
       throw new PermissionError(
-        "Your account has been disabled. Please contact your administrator to restore your account"
+        "Tài khoản của bạn vị vô hiệu hoá tạm thời vĩnh viễn"
       );
     }
     return next();

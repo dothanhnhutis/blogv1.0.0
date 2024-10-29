@@ -28,7 +28,7 @@ enum Gender {
 
 model User {
   id                       String          @id @default(uuid())
-  email                    String?         @unique
+  email                    String          @unique
   emailVerified            Boolean         @default(false)
   emailVerificationExpires DateTime? //24h
   emailVerificationToken   String?         @unique
@@ -39,7 +39,7 @@ model User {
   status                   UserStatus      @default(ACTIVE)
   reActiveToken            String?         @unique
   reActiveExpires          DateTime? //4h
-  fullName                 String?
+  fullName                 String
   birthDate                String?
   gender                   Gender?
   picture                  String?

@@ -17,7 +17,7 @@ type OauthProvider = {
 
 export type User = {
   id: string;
-  email: string | null;
+  email: string;
   emailVerified: boolean;
   //   emailVerificationExpires: Date | null;
   //   emailVerificationToken: string | null;
@@ -28,7 +28,7 @@ export type User = {
   //   passwordResetExpires: Date | null;
   //   reActiveToken: string | null;
   //   reActiveExpires: Date | null;
-  fullName: string | null;
+  fullName: string;
   birthDate: string | null;
   gender: UserGender;
   picture: string | null;
