@@ -19,7 +19,6 @@ export const taskListener = (io: Server) => {
 };
 
 export const taskSend = (data: any) => {
-  const factoryNamespace = SocketServer.io.of("/task");
-  SocketServer.io;
+  const factoryNamespace = SocketServer.getInstance().of("/task");
   factoryNamespace.emit("message", data);
 };

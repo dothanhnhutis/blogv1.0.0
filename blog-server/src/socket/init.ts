@@ -16,8 +16,9 @@ class SocketServer extends Server {
     super(httpServer, opt);
   }
 
-  public static createInstance(httpServer: http.Server): SocketServer {
+  public static getInstance(httpServer?: http.Server): SocketServer {
     if (!SocketServer.io) {
+      if (!httpServer) throw Error("httpServer to create SocketServer");
       SocketServer.io = new SocketServer(httpServer);
     }
     return SocketServer.io;

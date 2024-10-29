@@ -1,8 +1,9 @@
+"use client";
 import React from "react";
 import { format, FormatOptions } from "date-fns";
 
 export const clockHook = (formatStr?: string, options?: FormatOptions) => {
-  const [time, setTime] = React.useState(new Date());
+  const [time, setTime] = React.useState<Date>(new Date());
 
   React.useEffect(() => {
     // navigator.geolocation.getCurrentPosition(

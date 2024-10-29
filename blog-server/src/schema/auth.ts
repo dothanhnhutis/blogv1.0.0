@@ -1,6 +1,6 @@
 import * as z from "zod";
 
-const signUpSchema = z.object({
+export const signUpSchema = z.object({
   body: z
     .object({
       fullName: z.string({

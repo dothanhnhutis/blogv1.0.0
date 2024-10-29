@@ -48,8 +48,8 @@ model User {
   updatedAt                DateTime        @updatedAt
   oauthProviders           OauthProvider[]
   mfa                      MFA?
-  TaskAssignees            TaskAssignees[]
-  Task                     Task[]
+  taskAssignees            TaskAssignees[]
+  task                     Task[]
 
   @@index([email, emailVerificationToken, passwordResetToken, reActiveToken])
 }
@@ -98,8 +98,8 @@ enum TaskStatus {
 
 enum TaskPriority {
   LOW
-  MEDIUM
-  HIGH
+  NORMAL
+  URGENT
 }
 
 model TaskAssignees {

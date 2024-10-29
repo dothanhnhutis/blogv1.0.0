@@ -6,7 +6,7 @@ import { createSocket } from "@/lib/socket";
 
 interface ITaskContext {
   connected: boolean;
-  tasks: string[];
+  tasks: any[];
 }
 
 const initTaskContext: ITaskContext = {
@@ -39,6 +39,7 @@ const TaskProvider = ({ children }: TTaskProvider) => {
     setTaskData((prev) => ({ ...prev, connected: false }));
   }
   function onTaskEvent(value: any) {
+    console.log(value);
     setTaskData((prev) => ({ ...prev, tasks: [value, ...prev.tasks] }));
   }
 

@@ -22,6 +22,7 @@ const envSchema = z.object({
   CLOUDINARY_NAME: z.string(),
   CLOUDINARY_KEY: z.string(),
   CLOUDINARY_SECRET: z.string(),
+  RABBITMQ_URL: z.string(),
 });
 
 const configParser = envSchema.safeParse({
@@ -43,6 +44,7 @@ const configParser = envSchema.safeParse({
   CLOUDINARY_NAME: process.env.CLOUDINARY_NAME,
   CLOUDINARY_KEY: process.env.CLOUDINARY_KEY,
   CLOUDINARY_SECRET: process.env.CLOUDINARY_SECRET,
+  RABBITMQ_URL: process.env.RABBITMQ_URL,
 });
 
 if (!configParser.success) {

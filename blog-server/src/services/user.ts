@@ -1,18 +1,33 @@
+import config from "@/config";
+import { sendEmailProducer } from "@/rabbit/send-email";
+import {
+  getUserCacheByEmail,
+  getUserCacheById,
+  getUserCacheByToken,
+  saveUserCache,
+  saveUserCacheByToken,
+} from "@/redis/user.cache";
+import { SignUpReq } from "@/schema/auth";
+import { User, UserToken } from "@/schema/user";
 import prisma from "@/utils/db";
+import { hashData, randId } from "@/utils/helper";
+import { signJWT } from "@/utils/jwt";
+import { emaiEnum } from "@/utils/nodemailer";
+import { Prisma } from "@prisma/client";
 
 export const userSelectDefault = {
   id: true,
   email: true,
   emailVerified: true,
-  emailVerificationExpires: true,
-  emailVerificationToken: true,
+  // emailVerificationExpires: true,
+  // emailVerificationToken: true,
   role: true,
   status: true,
   password: true,
-  passwordResetToken: true,
-  passwordResetExpires: true,
-  reActiveToken: true,
-  reActiveExpires: true,
+  // passwordResetToken: true,
+  // passwordResetExpires: true,
+  // reActiveToken: true,
+  // reActiveExpires: true,
   fullName: true,
   gender: true,
   birthDate: true,
@@ -28,14 +43,19 @@ export const userSelectDefault = {
       updatedAt: true,
     },
   },
+  oauthProviders: {
+    select: {
+      providerId: true,
+      provider: true,
+    },
+  },
   createdAt: true,
   updatedAt: true,
 };
 
 export async function getUserByEmail(email: string) {
-  /**
-   * TODO: get from cache
-   */
+  const userCache = await getUserCacheByEmail(email);
+  if (userCache) return userCache;
 
   const user = await prisma.user.findUnique({
     where: {
@@ -43,8 +63,101 @@ export async function getUserByEmail(email: string) {
     },
     select: userSelectDefault,
   });
-  /**
-   * TODO: save to cache
-   */
+  if (user) await saveUserCache(user);
+  return user;
+}
+
+export async function getUserById(id: string) {
+  const userCache = await getUserCacheById(id);
+  if (userCache) return userCache;
+  const user = await prisma.user.findUnique({
+    where: {
+      id,
+    },
+    select: userSelectDefault,
+  });
+  if (user) await saveUserCache(user);
+  return user;
+}
+
+export async function getUserByToken(token: UserToken) {
+  const userCache = await getUserCacheByToken(token);
+  if (userCache) return userCache;
+
+  let user: User | null = null;
+  if (token.type == "emailVerification") {
+    user = await prisma.user.findUnique({
+      where: {
+        emailVerificationToken: token.session,
+        emailVerificationExpires: { gte: new Date() },
+      },
+      select: userSelectDefault,
+    });
+  } else if (token.type == "recoverAccount") {
+    user = await prisma.user.findUnique({
+      where: {
+        passwordResetToken: token.session,
+        passwordResetExpires: { gte: new Date() },
+      },
+      select: userSelectDefault,
+    });
+  } else if (token.type == "reActivate") {
+    await prisma.user.findUnique({
+      where: {
+        reActiveToken: token.session,
+        reActiveExpires: { gte: new Date() },
+      },
+      select: userSelectDefault,
+    });
+  }
+  if (!user) return;
+
+  await saveUserCache(user);
+  return user;
+}
+
+export async function insertUserWithPassword({
+  password,
+  ...rest
+}: Omit<SignUpReq["body"], "confirmPassword">) {
+  const expires: number = Math.floor((Date.now() + 4 * 60 * 60 * 1000) / 1000);
+  const session = await randId();
+  const token = signJWT(
+    {
+      type: "emailVerification",
+      session,
+      iat: expires,
+    },
+    config.JWT_SECRET
+  );
+
+  const data: Prisma.UserCreateInput = {
+    ...rest,
+    password: hashData(password),
+    emailVerificationExpires: new Date(expires * 1000),
+    emailVerificationToken: session,
+  };
+
+  const user = await prisma.user.create({
+    data,
+    select: userSelectDefault,
+  });
+
+  await saveUserCacheByToken(
+    { type: "emailVerification", session },
+    user.id,
+    expires
+  );
+  await saveUserCache(user);
+
+  await sendEmailProducer({
+    template: emaiEnum.SIGNUP,
+    receiver: rest.email,
+    locals: {
+      fullName: rest.fullName,
+      verificationLink: config.CLIENT_URL + "/confirm-email?token=" + token,
+    },
+  });
+
   return user;
 }

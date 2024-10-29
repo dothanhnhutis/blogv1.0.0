@@ -25,6 +25,7 @@ type LocalsPayload = {
     verificationLink: string;
   };
   [emaiEnum.SIGNUP]: {
+    fullName: string;
     verificationLink: string;
   };
   [emaiEnum.RECOVER_ACCOUNT]: {
@@ -102,8 +103,10 @@ export const sendMail = async ({
         ...locals,
       },
     });
+    return true;
   } catch (error: any) {
     console.log(error.message);
     console.log(error);
+    return false;
   }
 };
