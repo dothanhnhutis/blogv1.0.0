@@ -117,12 +117,26 @@ export async function deleteSessionByKey(sessionKey: string) {
   }
 }
 
-export async function deleteSessions(userId: string) {
+export async function deleteSessions(
+  userId: string,
+  exceptSessionId?: string[]
+) {
   try {
     const keys = await redisClient.keys(
       `${config.SESSION_KEY_NAME}:${userId}:*`
     );
-    await Promise.all(keys.map(async (key) => redisClient.del(key)));
+    if (!exceptSessionId) {
+      await Promise.all(keys.map(async (key) => redisClient.del(key)));
+    } else {
+      const safeSession = exceptSessionId.map(
+        (id) => `${config.SESSION_KEY_NAME}:${userId}:${id}`
+      );
+      await Promise.all(
+        keys
+          .filter((keys) => !exceptSessionId.includes(keys))
+          .map(async (key) => redisClient.del(key))
+      );
+    }
   } catch (error) {
     console.log(`deleteSessions() method error: `, error);
   }

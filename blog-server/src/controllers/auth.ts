@@ -21,7 +21,7 @@ import { compareData, encrypt, randId } from "@/utils/helper";
 import { createSession } from "@/redis/session";
 import { sendEmailProducer } from "@/rabbit/send-email";
 import { emaiEnum } from "@/utils/nodemailer";
-import { saveUserCacheByToken } from "@/redis/user.cache";
+import { deleteUserCacheToken, saveUserCacheByToken } from "@/redis/user.cache";
 import { UserToken } from "@/schema/user";
 
 export async function signUp(
@@ -50,15 +50,17 @@ export async function confirmEmail(
 
   if (!tokenVerify || tokenVerify.type != "emailVerification")
     throw new BadRequestError("Phiên của bạn đã hết hạn.");
-
   const user = await getUserByToken(tokenVerify);
   if (!user) throw new BadRequestError("Phiên của bạn đã hết hạn.");
 
-  await editUserById(user.id, {
-    emailVerified: true,
-    emailVerificationToken: null,
-    emailVerificationExpires: new Date(),
-  });
+  await Promise.all([
+    editUserById(user.id, {
+      emailVerified: true,
+      emailVerificationToken: null,
+      emailVerificationExpires: new Date(),
+    }),
+    deleteUserCacheToken(tokenVerify),
+  ]);
 
   return res.status(StatusCodes.OK).json({
     message: "Xác thực tài khoản thành công",
@@ -126,10 +128,35 @@ export async function recover(
   const expires: number = Math.floor((Date.now() + 4 * 60 * 60 * 1000) / 1000);
   const session = await randId();
 
-  await editUserById(user.id, {
-    passwordResetToken: session,
-    passwordResetExpires: new Date(expires * 1000),
-  });
+  const token = signJWT(
+    {
+      type: "recover",
+      session,
+      iat: expires,
+    },
+    config.JWT_SECRET
+  );
+  const recoverLink = `${config.CLIENT_URL}/reset-password?token=${token}`;
+
+  await Promise.all([
+    editUserById(user.id, {
+      passwordResetToken: session,
+      passwordResetExpires: new Date(expires * 1000),
+    }),
+    saveUserCacheByToken(
+      { type: "recover", session },
+      user.id,
+      new Date(expires * 1000).getTime() - Date.now()
+    ),
+    sendEmailProducer({
+      template: emaiEnum.RECOVER_ACCOUNT,
+      receiver: user!.email,
+      locals: {
+        username: user!.fullName,
+        recoverLink,
+      },
+    }),
+  ]);
 
   return res.status(StatusCodes.OK).send({
     message: "Email đổi mật khẩu đã được gửi",
@@ -154,11 +181,14 @@ export async function resetPassword(
   const user = await getUserByToken(tokenVerify);
   if (!user) throw new BadRequestError("Phiên của bạn đã hết hạn.");
 
-  await editUserById(user.id, {
-    password,
-    passwordResetExpires: new Date(),
-    passwordResetToken: null,
-  });
+  await Promise.all([
+    editUserById(user.id, {
+      password,
+      passwordResetExpires: new Date(),
+      passwordResetToken: null,
+    }),
+    deleteUserCacheToken(tokenVerify),
+  ]);
 
   return res.status(StatusCodes.OK).send({
     message: "Đặt lại mật khẩu thành công",
@@ -180,10 +210,35 @@ export async function sendReactivateAccount(
   const expires: number = Math.floor((Date.now() + 4 * 60 * 60 * 1000) / 1000);
   const session = await randId();
 
-  await editUserById(user.id, {
-    reActiveToken: session,
-    reActiveExpires: new Date(expires * 1000),
-  });
+  const token = signJWT(
+    {
+      type: "reActivate",
+      session,
+      iat: expires,
+    },
+    config.JWT_SECRET
+  );
+  const reactivateLink = `${config.CLIENT_URL}/reactivate?token=${token}`;
+
+  await Promise.all([
+    editUserById(user.id, {
+      reActiveToken: session,
+      reActiveExpires: new Date(expires * 1000),
+    }),
+    saveUserCacheByToken(
+      { type: "reActivate", session },
+      user.id,
+      new Date(expires * 1000).getTime() - Date.now()
+    ),
+    sendEmailProducer({
+      template: emaiEnum.REACTIVATE_ACCOUNT,
+      receiver: user.email,
+      locals: {
+        username: user.fullName,
+        reactivateLink,
+      },
+    }),
+  ]);
 
   return res.status(StatusCodes.OK).send({
     message: "Gửi email thành công",
@@ -204,11 +259,15 @@ export async function reActivateAccount(
   console.log(tokenVerify);
   const user = await getUserByToken(tokenVerify);
   if (!user) throw new BadRequestError("Phiên của bạn đã hết hạn");
-  await editUserById(user.id, {
-    status: "ACTIVE",
-    reActiveExpires: new Date(),
-    reActiveToken: null,
-  });
+
+  await Promise.all([
+    editUserById(user.id, {
+      status: "ACTIVE",
+      reActiveExpires: new Date(),
+      reActiveToken: null,
+    }),
+    deleteUserCacheToken(tokenVerify),
+  ]);
 
   return res.status(StatusCodes.OK).send({
     message: "Tài khoản đã được kích hoạt",

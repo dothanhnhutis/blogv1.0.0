@@ -177,101 +177,30 @@ export async function editUserById(
     status?: User["status"];
     reActiveToken?: string | null;
     reActiveExpires?: Date;
+    mfa?: {
+      secretKey: string;
+      backupCodes: string[];
+    };
   }
 ) {
+  const { mfa, ...rest } = input;
+
   let data: Prisma.UserUpdateInput = {
-    ...input,
+    ...rest,
   };
-  const user = await getUserCacheById(userId);
 
   if (input.password) {
     data.password = hashData(input.password);
   }
 
-  if (input.passwordResetExpires && input.passwordResetToken) {
-    const token = signJWT(
-      {
-        type: "recover",
-        session: input.passwordResetToken,
-        iat: input.passwordResetExpires.getTime() / 1000,
-      },
-      config.JWT_SECRET
-    );
-    const recoverLink = `${config.CLIENT_URL}/reset-password?token=${token}`;
-
-    await saveUserCacheByToken(
-      { type: "recover", session: input.passwordResetToken },
-      userId,
-      input.passwordResetExpires.getTime() - Date.now()
-    );
-
-    await sendEmailProducer({
-      template: emaiEnum.RECOVER_ACCOUNT,
-      receiver: user!.email,
-      locals: {
-        username: user!.fullName,
-        recoverLink,
+  if (mfa) {
+    await prisma.mFA.create({
+      data: {
+        userId,
+        backupCodes: mfa.backupCodes,
+        secretKey: mfa.secretKey,
       },
     });
-  }
-
-  if (input.reActiveToken && input.reActiveExpires) {
-    const token = signJWT(
-      {
-        type: "reActivate",
-        session: input.reActiveToken,
-        iat: input.reActiveExpires.getTime() / 1000,
-      },
-      config.JWT_SECRET
-    );
-    const recoverLink = `${config.CLIENT_URL}/reactivate?token=${token}`;
-
-    await saveUserCacheByToken(
-      { type: "reActivate", session: input.reActiveToken },
-      userId,
-      input.reActiveExpires.getTime() - Date.now()
-    );
-
-    await sendEmailProducer({
-      template: emaiEnum.RECOVER_ACCOUNT,
-      receiver: user!.email,
-      locals: {
-        username: user!.fullName,
-        recoverLink,
-      },
-    });
-  }
-
-  if (input.email) {
-    const expires: number = Math.floor(
-      (Date.now() + 4 * 60 * 60 * 1000) / 1000
-    );
-    const session = await randId();
-    const token = signJWT(
-      {
-        type: "emailVerification",
-        session,
-        iat: expires,
-      },
-      config.JWT_SECRET
-    );
-    await saveUserCacheByToken(
-      { type: "emailVerification", session },
-      userId,
-      expires
-    );
-    await sendMail({
-      template: emaiEnum.VERIFY_EMAIL,
-      receiver: input.email,
-      locals: {
-        username: input.fullName || user!.fullName || "",
-        verificationLink: config.CLIENT_URL + "/confirm-email?token=" + token,
-      },
-    });
-  }
-
-  if (input.status && input.status != "ACTIVE") {
-    await deleteSessions(userId);
   }
 
   const newUser = await prisma.user.update({
@@ -285,4 +214,12 @@ export async function editUserById(
   await saveUserCache(newUser);
 
   return newUser;
+}
+
+export async function deleteMFA(userId: string) {
+  await prisma.mFA.delete({
+    where: {
+      userId,
+    },
+  });
 }
