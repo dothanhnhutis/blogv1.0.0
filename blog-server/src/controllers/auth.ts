@@ -7,6 +7,7 @@ import {
   ResetPasswordReq,
   SendReActivateAccountReq,
   SignInReq,
+  SignInWithMFAReq,
   SignUpReq,
 } from "@/schema/auth";
 import {
@@ -18,11 +19,17 @@ import {
 import { signJWT, verifyJWT } from "@/utils/jwt";
 import config from "@/config";
 import { compareData, encrypt, randId } from "@/utils/helper";
-import { createSession } from "@/redis/session";
+import {
+  createMFASession,
+  createSession,
+  deleteMFASession,
+  getMFASession,
+} from "@/redis/session";
 import { sendEmailProducer } from "@/rabbit/send-email";
 import { emaiEnum } from "@/utils/nodemailer";
 import { deleteUserCacheToken, saveUserCacheByToken } from "@/redis/user.cache";
 import { UserToken } from "@/schema/user";
+import { validateMFA } from "@/utils/mfa";
 
 export async function signUp(
   req: Request<{}, {}, SignUpReq["body"]>,
@@ -86,35 +93,90 @@ export async function signIn(
     throw new BadRequestError("Tài khoản của bạn đã vô hiệu hoá vĩnh viễn");
 
   if (!user.mfa) {
-    const { sessionKey, cookieOpt } = await createSession({
+    const sessionData = await createSession({
       userId: user.id,
       reqIp: req.ip || "",
       userAgent: req.headers["user-agent"] || "",
     });
-
+    if (!sessionData)
+      throw new BadRequestError("Email và mật khẩu không hợp lệ.");
     return res
       .status(StatusCodes.OK)
       .cookie(
         config.SESSION_KEY_NAME,
-        encrypt(sessionKey, config.SESSION_SECRET),
+        encrypt(sessionData.sessionKey, config.SESSION_SECRET),
         {
-          ...cookieOpt,
+          ...sessionData.cookieOpt,
         }
       )
       .json({
         message: "Đăng nhập thành công",
       });
   } else {
-    /**
-     * TODO: implement  login with MFA
-     */
+    const sessionId = await createMFASession({
+      userId: user.id,
+      backupCodes: user.mfa.backupCodes,
+      secretKey: user.mfa.secretKey,
+    });
+    if (!sessionId)
+      throw new BadRequestError("Email và mật khẩu không hợp lệ.");
 
-    // const sessionId = await createMFASession(user);
     return res.status(StatusCodes.OK).json({
       message: "Đăng nhập thành công",
-      // sessionId,
+      sessionId,
     });
   }
+}
+
+export async function signInWithMFA(
+  req: Request<{}, {}, SignInWithMFAReq["body"]>,
+  res: Response
+) {
+  const { sessionId, code, isBackupCode } = req.body;
+  const mfa = await getMFASession(sessionId);
+  console.log(
+    validateMFA({
+      secret: mfa!.secretKey,
+      token: code,
+    }) == 0
+  );
+
+  if (
+    !mfa ||
+    (isBackupCode && !mfa.backupCodes.includes(code)) ||
+    (!isBackupCode &&
+      !(
+        validateMFA({
+          secret: mfa.secretKey,
+          token: code,
+        }) == 0
+      ))
+  ) {
+    throw new BadRequestError("Mã xác thực đã hết hạn");
+  }
+
+  const sessionData = await createSession({
+    userId: mfa.userId,
+    reqIp: req.ip || "",
+    userAgent: req.headers["user-agent"] || "",
+  });
+
+  if (!sessionData) throw new BadRequestError("Mã xác thực không hợp lệ");
+
+  await deleteMFASession(sessionId);
+
+  return res
+    .status(StatusCodes.OK)
+    .cookie(
+      config.SESSION_KEY_NAME,
+      encrypt(sessionData.sessionKey, config.SESSION_SECRET),
+      {
+        ...sessionData.cookieOpt,
+      }
+    )
+    .json({
+      message: "Đăng nhập thành công",
+    });
 }
 
 export async function recover(

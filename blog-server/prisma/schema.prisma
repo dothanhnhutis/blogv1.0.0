@@ -89,6 +89,13 @@ model MFA {
   @@index([backupCodes, backupCodesUsed])
 }
 
+model Plan {
+  id              String @id @default(uuid())
+  planName        String
+  planDescription String
+  member          String
+}
+
 enum TaskStatus {
   TO_DO
   ON_PROGRESS

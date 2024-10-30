@@ -12,7 +12,6 @@ import {
   generateMFASetup,
   getMFASetup,
   getUserCacheOTP,
-  saveUserCache,
   saveUserCacheByToken,
   saveUserCacheOTP,
 } from "@/redis/user.cache";

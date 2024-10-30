@@ -217,9 +217,16 @@ export async function editUserById(
 }
 
 export async function deleteMFA(userId: string) {
-  await prisma.mFA.delete({
+  const { user } = await prisma.mFA.delete({
     where: {
       userId,
     },
+    select: {
+      user: {
+        select: userSelectDefault,
+      },
+    },
   });
+  console.log(user);
+  await saveUserCache(user);
 }

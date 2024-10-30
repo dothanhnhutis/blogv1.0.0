@@ -126,7 +126,7 @@ export async function deleteUserCacheOTP(
   }
 }
 
-type MFASetup = {
+export type MFASetup = {
   backupCodes: string[];
   totp: TOTPType;
 };

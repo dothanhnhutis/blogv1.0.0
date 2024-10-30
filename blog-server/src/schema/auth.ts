@@ -56,6 +56,29 @@ export const signInSchema = z.object({
     .strict(),
 });
 
+export const signInWithMFASchema = z.object({
+  body: z
+    .object({
+      sessionId: z.string({
+        required_error: "sessionId là trường bắt buộc",
+        invalid_type_error: "sessionId phải là chuỗi",
+      }),
+      isBackupCode: z
+        .boolean({
+          required_error: "isBackupCode là trường bắt buộc",
+          invalid_type_error: "isBackupCode phải là chuỗi",
+        })
+        .default(false),
+      code: z
+        .string({
+          required_error: "code là trường bắt buộc",
+          invalid_type_error: "code phải là chuỗi",
+        })
+        .length(6, "code không hợp lệ"),
+    })
+    .strict(),
+});
+
 export const recoverSchema = z.object({
   body: z
     .object({
@@ -110,6 +133,7 @@ export const sendReActivateAccountSchema = z.object({
 
 export type SignUpReq = z.infer<typeof signUpSchema>;
 export type SignInReq = z.infer<typeof signInSchema>;
+export type SignInWithMFAReq = z.infer<typeof signInWithMFASchema>;
 export type RecoverReq = z.infer<typeof recoverSchema>;
 export type ResetPasswordReq = z.infer<typeof resetPasswordSchema>;
 export type SendReActivateAccountReq = z.infer<

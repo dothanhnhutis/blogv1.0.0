@@ -4,6 +4,7 @@ import { UAParser } from "ua-parser-js";
 import { redisClient } from "@/redis/connection";
 import { CookieOptions } from "express";
 import config from "@/config";
+import { MFASetup } from "./user.cache";
 
 export type SessionData = {
   id: string;
@@ -24,37 +25,83 @@ export type CreateSession = {
 };
 const SESSION_MAX_AGE = 30 * 24 * 60 * 60000;
 
+type MFASession = {
+  userId: string;
+  secretKey: string;
+  backupCodes: string[];
+};
+
+export async function createMFASession(data: MFASession) {
+  try {
+    const sessionId = uuidv4();
+    await redisClient.set(
+      `${config.SESSION_KEY_NAME}:mfa:${sessionId}`,
+      JSON.stringify(data),
+      "EX",
+      5 * 60
+    );
+    return sessionId;
+  } catch (error: unknown) {
+    console.log(`createMFASession() method error: `, error);
+  }
+}
+
+export async function getMFASession(mfaSessionId: string) {
+  try {
+    const mfaData = await redisClient.get(
+      `${config.SESSION_KEY_NAME}:mfa:${mfaSessionId}`
+    );
+    if (!mfaData) return;
+
+    return JSON.parse(mfaData) as MFASession;
+  } catch (error: unknown) {
+    console.log(`getMFASession() method error: `, error);
+  }
+}
+
+export async function deleteMFASession(mfaSessionId: string) {
+  try {
+    await redisClient.del(`${config.SESSION_KEY_NAME}:mfa:${mfaSessionId}`);
+  } catch (error: unknown) {
+    console.log(`deleteMFASession() method error: `, error);
+  }
+}
+
 export async function createSession(input: CreateSession) {
-  const sessionId = uuidv4();
-  const sessionKey = `${config.SESSION_KEY_NAME}:${input.userId}:${sessionId}`;
-  const now = new Date();
-  const cookieOpt = {
-    path: "/",
-    httpOnly: true,
-    secure: false,
-    expires: new Date(now.getTime() + SESSION_MAX_AGE),
-  };
+  try {
+    const sessionId = uuidv4();
+    const sessionKey = `${config.SESSION_KEY_NAME}:${input.userId}:${sessionId}`;
+    const now = new Date();
+    const cookieOpt = {
+      path: "/",
+      httpOnly: true,
+      secure: false,
+      expires: new Date(now.getTime() + SESSION_MAX_AGE),
+    };
 
-  const sessionData: SessionData = {
-    id: sessionId,
-    userId: input.userId,
-    cookie: cookieOpt,
-    reqInfo: {
-      ip: input.reqIp || "",
-      userAgent: UAParser(input.userAgent),
-      lastAccess: now,
-      createAt: now,
-    },
-  };
+    const sessionData: SessionData = {
+      id: sessionId,
+      userId: input.userId,
+      cookie: cookieOpt,
+      reqInfo: {
+        ip: input.reqIp || "",
+        userAgent: UAParser(input.userAgent),
+        lastAccess: now,
+        createAt: now,
+      },
+    };
 
-  await redisClient.set(
-    sessionKey,
-    JSON.stringify(sessionData),
-    "PX",
-    Math.abs(cookieOpt.expires.getTime() - Date.now())
-  );
+    await redisClient.set(
+      sessionKey,
+      JSON.stringify(sessionData),
+      "PX",
+      Math.abs(cookieOpt.expires.getTime() - Date.now())
+    );
 
-  return { sessionKey, cookieOpt };
+    return { sessionKey, cookieOpt };
+  } catch (error: unknown) {
+    console.log(`createSession() method error: `, error);
+  }
 }
 
 export async function getSessionByKey(sessionKey: string) {

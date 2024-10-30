@@ -7,6 +7,7 @@ import {
   resetPassword,
   sendReactivateAccount,
   signIn,
+  signInWithMFA,
   signUp,
 } from "@/controllers/auth";
 import {
@@ -14,6 +15,7 @@ import {
   resetPasswordSchema,
   sendReActivateAccountSchema,
   signInSchema,
+  signInWithMFASchema,
   signUpSchema,
 } from "@/schema/auth";
 import { rateLimitEmail } from "@/middleware/rateLimit";
@@ -25,6 +27,12 @@ function authRouter(): Router {
 
   router.post("/auth/signup", validateResource(signUpSchema), signUp);
   router.post("/auth/signin", validateResource(signInSchema), signIn);
+  router.post(
+    "/auth/signin/mfa",
+    validateResource(signInWithMFASchema),
+    signInWithMFA
+  );
+
   router.post(
     "/auth/recover",
     rateLimitEmail,
