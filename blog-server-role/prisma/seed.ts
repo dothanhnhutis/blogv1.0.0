@@ -1,32 +1,44 @@
 import prisma from "@/utils/db";
 
-async function seed() {
-  const permissions = [
-    { permission_name: "create_user" },
-    { permission_name: "edit_user" },
-    { permission_name: "delete_user" },
-    { permission_name: "view_user" },
+async function initDB() {
+  const superAdminEmail: string = "gaconght@gmail.com";
 
-    { permission_name: "create_plan" },
-    { permission_name: "edit_plan" },
-    { permission_name: "delete_plan" },
-    { permission_name: "view_plan" },
-
-    { permission_name: "create_post" },
-    { permission_name: "edit_post" },
-    { permission_name: "delete_post" },
-    { permission_name: "view_post" },
+  const permissions: string[] = [
+    "user_create",
+    "user_read",
+    "user_update",
+    "user_delete",
+    "plan_create",
+    "plan_read",
+    "plan_update",
+    "plan_delete",
+    "plan_member_role_create",
+    "plan_member_role_read",
+    "plan_member_role_update",
+    "plan_member_role_delete",
+    "task_create",
+    "task_read",
+    "task_update",
+    "task_delete",
+    "subtask_create",
+    "subtask_read",
+    "subtask_update",
+    "subtask_delete",
   ];
 
-  const superRole = await prisma.role.create({
+  const role = await prisma.role.create({
     data: {
       role_name: "Super Admin",
-      role_permissions: {
-        create: permissions.map((per) => ({
+      role_permission: {
+        create: permissions.map((permission_name) => ({
           permission: {
             connectOrCreate: {
-              where: per,
-              create: per,
+              create: {
+                permission_name,
+              },
+              where: {
+                permission_name,
+              },
             },
           },
         })),
@@ -34,39 +46,18 @@ async function seed() {
     },
   });
 
-  const adminRole = await prisma.role.create({
+  const user = await prisma.user.create({
     data: {
-      role_name: "Admin",
-      role_permissions: {
-        create: permissions
-          .filter((per) => !per.permission_name.endsWith("user"))
-          .map((per) => ({
-            permission: {
-              connectOrCreate: {
-                where: per,
-                create: per,
-              },
-            },
-          })),
-      },
-    },
-  });
-
-  await prisma.user.upsert({
-    where: {
-      email: "gaconght@gmail.com",
-    },
-    update: {},
-    create: {
-      username: "thanh nhut",
-      email: "gaconght@gmail.com",
-      password: "@Abc123123",
-      userRole: {
+      email: superAdminEmail,
+      username: "Thanh Nhut",
+      role: {
         create: [
           {
+            role_name: "",
             role: {
-              connect: {
-                id: superRole.id,
+              connectOrCreate: {
+                create: {},
+                where: {},
               },
             },
           },
@@ -74,42 +65,135 @@ async function seed() {
       },
     },
   });
+}
 
-  const kk = await prisma.user.findUnique({
-    where: { email: "gaconght@gmail.com" },
+async function seed() {
+  const superAdminEmail: string = "gaconght@gmail.com";
+  const permissions: string[] = [
+    "user_create",
+    "user_read",
+    "user_update",
+    "user_delete",
+    "plan_create",
+    "plan_read",
+    "plan_update",
+    "plan_delete",
+    "plan_member_role_create",
+    "plan_member_role_read",
+    "plan_member_role_update",
+    "plan_member_role_delete",
+    "task_create",
+    "task_read",
+    "task_update",
+    "task_delete",
+    "subtask_create",
+    "subtask_read",
+    "subtask_update",
+    "subtask_delete",
+  ];
 
-    select: {
-      userRole: {
-        select: {
-          role: {
-            select: {
-              role_permissions: {
-                select: {
-                  permission: true,
-                },
-              },
-            },
-          },
-        },
+  await prisma.permission.deleteMany({
+    where: {
+      permission_name: {
+        notIn: permissions,
       },
     },
   });
 
-  const permissionsData: Record<string, number> = {};
-  kk!.userRole.forEach((userRole) => {
-    userRole.role.role_permissions.forEach((rolePermission) => {
-      permissionsData[rolePermission.permission.permission_name] = 1;
-    });
+  await prisma.role.upsert({
+    where: { role_name: "Super Admin" },
+    create: {
+      role_name: "Super Admin",
+      role_permission: {
+        create,
+      },
+    },
+    update: {},
   });
-  console.log(permissionsData);
+
+  // let superAdminRole = await prisma.role.findFirst({
+  //   where: {
+  //     role_name: "Super Admin",
+  //   },
+  // });
+
+  // Tạo hoặc cập nhật cho "Super Admin"
+  // if (superAdminRole) {
+  //   await prisma.role.upsert({
+  //     where: {
+  //       id: superAdminRole.id,
+  //     },
+  //     update: {
+  //       role_permission: {
+  //         connectOrCreate: permissions.map((permission_name) => ({
+  //           where: {
+  //             role_id_permission_name: {
+  //               permission_name,
+  //               role_id: superAdminRole.id,
+  //             },
+  //           },
+  //           create: {
+  //             permission: {
+  //               connectOrCreate: {
+  //                 where: {
+  //                   permission_name,
+  //                 },
+  //                 create: {
+  //                   permission_name,
+  //                 },
+  //               },
+  //             },
+  //           },
+  //         })),
+  //       },
+  //     },
+  //     create: {
+  //       role_name: "Super Admin",
+  //       role_permission: {
+  //         create: permissions.map((permission_name) => ({
+  //           permission: {
+  //             connectOrCreate: {
+  //               where: {
+  //                 permission_name,
+  //               },
+  //               create: {
+  //                 permission_name,
+  //               },
+  //             },
+  //           },
+  //         })),
+  //       },
+  //     },
+  //   });
+  // } else {
+  //   await prisma.role.create({
+  //     data: {
+  //       role_name: "Super Admin",
+  //       role_permission: {
+  //         create: permissions.map((permission_name) => ({
+  //           permission: {
+  //             connectOrCreate: {
+  //               where: {
+  //                 permission_name,
+  //               },
+  //               create: {
+  //                 permission_name,
+  //               },
+  //             },
+  //           },
+  //         })),
+  //       },
+  //     },
+  //   });
+  // }
 }
 
-seed()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (e) => {
-    console.error(e);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
+// seed()
+//   .then(async () => {
+//     await prisma.$disconnect();
+//   })
+//   .catch(async (e) => {
+//     console.error(e);
+//     await prisma.$disconnect();
+//     process.exit(1);
+//   });

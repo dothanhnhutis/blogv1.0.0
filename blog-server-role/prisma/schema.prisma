@@ -7,47 +7,96 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
 model User {
-  id         String     @id @default(uuid())
-  username   String
-  email      String     @unique
-  password   String
-  userRole   UserRole[]
-  created_at DateTime   @default(now())
-  updated_at DateTime   @updatedAt
+  id                         String          @id @default(uuid())
+  email                      String          @unique
+  email_verified             Boolean         @default(false)
+  email_verification_expires DateTime? //24h
+  email_verification_token   String?         @unique
+  password                   String?
+  password_reset_token       String?         @unique
+  password_reset_expires     DateTime? //4h
+  role                       UserRole[]
+  status                     UserStatus      @default(ACTIVE)
+  reActive_token             String?         @unique
+  reActive_expires           DateTime? //4h
+  username                   String
+  gender                     Gender?
+  picture                    String?
+  phone_number               String?
+  created_at                 DateTime        @default(now())
+  updated_at                 DateTime        @updatedAt
+  oauth_provider             OauthProvider[]
+  mfa                        MFA[]
+}
+
+model OauthProvider {
+  provider_id String
+  provider    String
+  user_id     String
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@id([user_id, provider])
+  @@unique([provider, provider_id])
+}
+
+model MFA {
+  secret_key        String
+  last_access       DateTime
+  backup_code       String[]
+  backup_codes_used String[] @default([])
+  user_id           String
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id])
+  @@index([backup_code, backup_codes_used])
 }
 
 model UserRole {
-  user_id String
-  role_id String
-  user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  role    Role   @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  user_id   String
+  role_name String
+  user      User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  role      Role   @relation(fields: [role_name], references: [role_name], onDelete: Cascade)
 
-  @@id([user_id, role_id])
+  @@id([user_id, role_name])
 }
 
 model Role {
-  id               String            @id @default(uuid())
-  role_name        String
-  created_at       DateTime          @default(now())
-  updated_at       DateTime          @updatedAt
-  user_role        UserRole[]
-  role_permissions RolePermissions[]
+  role_name       String           @id
+  created_at      DateTime         @default(now())
+  updated_at      DateTime         @updatedAt
+  user_role       UserRole[]
+  role_permission RolePermission[]
 }
 
-model RolePermissions {
-  role_id       String
-  permission_id String
-  role          Role       @relation(fields: [role_id], references: [id], onDelete: Cascade)
-  permission    Permission @relation(fields: [permission_id], references: [id], onDelete: Cascade)
-  created_at    DateTime   @default(now())
+model RolePermission {
+  role_name       String
+  permission_name String
+  role            Role       @relation(fields: [role_name], references: [role_name], onDelete: Cascade)
+  permission      Permission @relation(fields: [permission_name], references: [permission_name], onDelete: Cascade)
+  created_at      DateTime   @default(now())
 
-  @@id([role_id, permission_id])
+  @@id([role_name, permission_name])
 }
 
 model Permission {
-  id               String            @id @default(uuid())
-  permission_name  String            @unique
-  role_permissions RolePermissions[]
-  created_at       DateTime          @default(now())
+  permission_name String           @id
+  created_at      DateTime         @default(now())
+  role_permission RolePermission[]
 }
