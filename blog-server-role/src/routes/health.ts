@@ -1,10 +1,10 @@
-import { health } from "@/controllers/health";
+import { test } from "@/controllers/health";
 import express, { type Router } from "express";
 
 const router: Router = express.Router();
-function healthRouter(): Router {
-  router.get("/health", health);
+function planRouter(): Router {
+  router.get("/plan", test);
   return router;
 }
 
-export default healthRouter();
+export default planRouter();

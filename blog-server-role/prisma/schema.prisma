@@ -19,37 +19,36 @@ enum Gender {
   OTHER
 }
 
-model User {
-  id                         String          @id @default(uuid())
-  email                      String          @unique
-  email_verified             Boolean         @default(false)
+model Users {
+  id                         String           @id @default(uuid())
+  email                      String           @unique
+  email_verified             Boolean          @default(false)
   email_verification_expires DateTime? //24h
-  email_verification_token   String?         @unique
+  email_verification_token   String?          @unique
   password                   String?
-  password_reset_token       String?         @unique
+  password_reset_token       String?          @unique
   password_reset_expires     DateTime? //4h
-  role                       UserRole[]
-  status                     UserStatus      @default(ACTIVE)
-  reActive_token             String?         @unique
+  roles                      UsersRoles[]
+  status                     UserStatus       @default(ACTIVE)
+  reActive_token             String?          @unique
   reActive_expires           DateTime? //4h
   username                   String
   gender                     Gender?
   picture                    String?
   phone_number               String?
-  created_at                 DateTime        @default(now())
-  updated_at                 DateTime        @updatedAt
-  oauth_provider             OauthProvider[]
+  created_at                 DateTime         @default(now())
+  updated_at                 DateTime         @updatedAt
+  oauth_provider             OauthProviders[]
   mfa                        MFA[]
-  Plan                       Plan[]
-  PlanMember                 PlanMember[]
-  Role                       Role[]
+  plans                      Plans[]
+  planMember                 PlanMembers[]
 }
 
-model OauthProvider {
+model OauthProviders {
   provider_id String
   provider    String
   user_id     String
-  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user        Users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 
@@ -65,59 +64,64 @@ model MFA {
   user_id           String
   created_at        DateTime @default(now())
   updated_at        DateTime @updatedAt
-  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user              Users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@id([user_id])
   @@index([backup_code, backup_codes_used])
 }
 
-model UserRole {
+model UsersRoles {
   user_id String
   role_id String
-  user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  role    Role   @relation(fields: [role_id], references: [role_id], onDelete: Cascade)
+  user    Users  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  role    Roles  @relation(fields: [role_id], references: [role_id], onDelete: Cascade)
 
   @@id([user_id, role_id])
 }
 
-model Role {
-  role_id    String     @id @default(uuid())
+model Roles {
+  role_id    String       @id @default(uuid())
   role_name  String
-  read_only  Boolean    @default(false)
+  read_only  Boolean      @default(false)
   permission String[]
-  user_role  UserRole[]
-  created_at DateTime   @default(now())
-  updated_at DateTime   @updatedAt
+  user_role  UsersRoles[]
+  created_at DateTime     @default(now())
+  updated_at DateTime     @updatedAt
   userId     String?
 }
 
-// model Plan {
-//   id               String       @id @default(uuid())
-//   plan_name        String
-//   plan_description String
-//   create_by_id     String
-//   create_by        User         @relation(fields: [create_by_id], references: [id], onDelete: Cascade)
-//   member           PlanMember[]
-//   start_date       DateTime
-//   due_date         DateTime
-//   create_at        DateTime     @default(now())
-//   update_at        DateTime     @updatedAt
-// }
+model Plans {
+  id               String        @id @default(uuid())
+  plan_name        String
+  plan_description String
+  create_by_id     String
+  create_by        Users         @relation(fields: [create_by_id], references: [id], onDelete: Cascade)
+  members          PlanMembers[]
+  start_date       DateTime
+  due_date         DateTime
+  create_at        DateTime      @default(now())
+  update_at        DateTime      @updatedAt
+  plan_roles       PlanRoles[]
+}
 
-// model PlanMember {
-//   user_id String
-//   plan_id String
-//   user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
-//   plan    Plan   @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+model PlanMembers {
+  user_id      String
+  plan_id      String
+  plan_role_id String
+  plan_role    PlanRoles @relation(fields: [plan_role_id], references: [id], onDelete: Cascade)
+  user         Users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  plan         Plans     @relation(fields: [plan_id], references: [id], onDelete: Cascade)
 
-//   @@id([user_id, plan_id])
-// }
+  @@id([plan_id, user_id, plan_role_id])
+}
 
-// model PlanRole {
-//   id              String   @id @default(uuid())
-//   plan_id         String
-//   plan_role_name  String
-//   plan_permission String[]
-//   create_at       DateTime @default(now())
-//   update_at       DateTime @updatedAt
-// }
+model PlanRoles {
+  id              String        @id @default(uuid())
+  plan_id         String
+  plan            Plans         @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  plan_role_name  String
+  plan_permission String[]
+  create_at       DateTime      @default(now())
+  update_at       DateTime      @updatedAt
+  PlanMembers     PlanMembers[]
+}
