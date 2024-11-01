@@ -1,199 +1,121 @@
 import prisma from "@/utils/db";
+import { hashData } from "@/utils/helper";
+const planPermission: string[] = [
+  "planMemberRole:create",
+  "planMemberRole:read",
+  "planMemberRole:update",
+  "planMemberRole:delete",
+  "task:create",
+  "task:read",
+  "task:update",
+  "task:delete",
+  "subtask:create",
+  "subtask:read",
+  "subtask:update",
+  "subtask:delete",
+];
+
+const ownerPermission: string[] = ["role:owner", "user:owner", "plan:owner"];
+
+const userPermissions: string[] = [
+  "user:create",
+  "user:read",
+  "user:update",
+  "user:delete",
+
+  "plan:create",
+  "plan:read",
+  "plan:update",
+  "plan:delete",
+];
 
 async function initDB() {
   const superAdminEmail: string = "gaconght@gmail.com";
 
-  const permissions: string[] = [
-    "user_create",
-    "user_read",
-    "user_update",
-    "user_delete",
-    "plan_create",
-    "plan_read",
-    "plan_update",
-    "plan_delete",
-    "plan_member_role_create",
-    "plan_member_role_read",
-    "plan_member_role_update",
-    "plan_member_role_delete",
-    "task_create",
-    "task_read",
-    "task_update",
-    "task_delete",
-    "subtask_create",
-    "subtask_read",
-    "subtask_update",
-    "subtask_delete",
-  ];
-
-  const role = await prisma.role.create({
-    data: {
+  const role = await prisma.role.findFirst({
+    where: {
       role_name: "Super Admin",
-      role_permission: {
-        create: permissions.map((permission_name) => ({
-          permission: {
-            connectOrCreate: {
-              create: {
-                permission_name,
-              },
-              where: {
-                permission_name,
-              },
-            },
-          },
-        })),
-      },
     },
   });
 
-  const user = await prisma.user.create({
-    data: {
+  await prisma.role.upsert({
+    where: {
+      role_id: role ? role.role_id : undefined,
+    },
+    create: {
+      role_name: "Super Admin",
+      read_only: true,
+      permission: ownerPermission,
+    },
+    update: {
+      permission: ownerPermission,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: {
+      email: superAdminEmail,
+    },
+    create: {
       email: superAdminEmail,
       username: "Thanh Nhut",
+      password: hashData("@Abc123123"),
+      email_verified: true,
+      email_verification_token: null,
+      email_verification_expires: new Date(),
       role: {
         create: [
           {
-            role_name: "",
             role: {
-              connectOrCreate: {
-                create: {},
-                where: {},
+              create: {
+                role_name: "Super Admin",
+                read_only: true,
+                permission: ownerPermission,
               },
             },
           },
         ],
       },
     },
+    update: {},
   });
 }
 
-async function seed() {
-  const superAdminEmail: string = "gaconght@gmail.com";
-  const permissions: string[] = [
-    "user_create",
-    "user_read",
-    "user_update",
-    "user_delete",
-    "plan_create",
-    "plan_read",
-    "plan_update",
-    "plan_delete",
-    "plan_member_role_create",
-    "plan_member_role_read",
-    "plan_member_role_update",
-    "plan_member_role_delete",
-    "task_create",
-    "task_read",
-    "task_update",
-    "task_delete",
-    "subtask_create",
-    "subtask_read",
-    "subtask_update",
-    "subtask_delete",
-  ];
-
-  await prisma.permission.deleteMany({
+async function createAdminRole(email: string, permission: string[]) {
+  await prisma.user.upsert({
     where: {
-      permission_name: {
-        notIn: permissions,
-      },
+      email,
     },
-  });
-
-  await prisma.role.upsert({
-    where: { role_name: "Super Admin" },
     create: {
-      role_name: "Super Admin",
-      role_permission: {
-        create,
+      email,
+      username: "",
+      password: hashData("@Abc123123"),
+      role: {
+        create: [
+          {
+            role: {
+              create: {
+                role_name: "Admin",
+                read_only: true,
+                permission: permission,
+              },
+            },
+          },
+        ],
       },
     },
     update: {},
   });
-
-  // let superAdminRole = await prisma.role.findFirst({
-  //   where: {
-  //     role_name: "Super Admin",
-  //   },
-  // });
-
-  // Tạo hoặc cập nhật cho "Super Admin"
-  // if (superAdminRole) {
-  //   await prisma.role.upsert({
-  //     where: {
-  //       id: superAdminRole.id,
-  //     },
-  //     update: {
-  //       role_permission: {
-  //         connectOrCreate: permissions.map((permission_name) => ({
-  //           where: {
-  //             role_id_permission_name: {
-  //               permission_name,
-  //               role_id: superAdminRole.id,
-  //             },
-  //           },
-  //           create: {
-  //             permission: {
-  //               connectOrCreate: {
-  //                 where: {
-  //                   permission_name,
-  //                 },
-  //                 create: {
-  //                   permission_name,
-  //                 },
-  //               },
-  //             },
-  //           },
-  //         })),
-  //       },
-  //     },
-  //     create: {
-  //       role_name: "Super Admin",
-  //       role_permission: {
-  //         create: permissions.map((permission_name) => ({
-  //           permission: {
-  //             connectOrCreate: {
-  //               where: {
-  //                 permission_name,
-  //               },
-  //               create: {
-  //                 permission_name,
-  //               },
-  //             },
-  //           },
-  //         })),
-  //       },
-  //     },
-  //   });
-  // } else {
-  //   await prisma.role.create({
-  //     data: {
-  //       role_name: "Super Admin",
-  //       role_permission: {
-  //         create: permissions.map((permission_name) => ({
-  //           permission: {
-  //             connectOrCreate: {
-  //               where: {
-  //                 permission_name,
-  //               },
-  //               create: {
-  //                 permission_name,
-  //               },
-  //             },
-  //           },
-  //         })),
-  //       },
-  //     },
-  //   });
-  // }
 }
 
-// seed()
-//   .then(async () => {
-//     await prisma.$disconnect();
-//   })
-//   .catch(async (e) => {
-//     console.error(e);
-//     await prisma.$disconnect();
-//     process.exit(1);
-//   });
+async function insertUser(email: string) {}
+
+initDB()
+  .then(async () => {
+    await prisma.$disconnect();
+  })
+  .catch(async (e) => {
+    console.error(e);
+    await prisma.$disconnect();
+    process.exit(1);
+  });

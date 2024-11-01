@@ -40,6 +40,9 @@ model User {
   updated_at                 DateTime        @updatedAt
   oauth_provider             OauthProvider[]
   mfa                        MFA[]
+  Plan                       Plan[]
+  PlanMember                 PlanMember[]
+  Role                       Role[]
 }
 
 model OauthProvider {
@@ -69,34 +72,52 @@ model MFA {
 }
 
 model UserRole {
-  user_id   String
-  role_name String
-  user      User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  role      Role   @relation(fields: [role_name], references: [role_name], onDelete: Cascade)
+  user_id String
+  role_id String
+  user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  role    Role   @relation(fields: [role_id], references: [role_id], onDelete: Cascade)
 
-  @@id([user_id, role_name])
+  @@id([user_id, role_id])
 }
 
 model Role {
-  role_name       String           @id
-  created_at      DateTime         @default(now())
-  updated_at      DateTime         @updatedAt
-  user_role       UserRole[]
-  role_permission RolePermission[]
+  role_id    String     @id @default(uuid())
+  role_name  String
+  read_only  Boolean    @default(false)
+  permission String[]
+  user_role  UserRole[]
+  created_at DateTime   @default(now())
+  updated_at DateTime   @updatedAt
+  userId     String?
 }
 
-model RolePermission {
-  role_name       String
-  permission_name String
-  role            Role       @relation(fields: [role_name], references: [role_name], onDelete: Cascade)
-  permission      Permission @relation(fields: [permission_name], references: [permission_name], onDelete: Cascade)
-  created_at      DateTime   @default(now())
+// model Plan {
+//   id               String       @id @default(uuid())
+//   plan_name        String
+//   plan_description String
+//   create_by_id     String
+//   create_by        User         @relation(fields: [create_by_id], references: [id], onDelete: Cascade)
+//   member           PlanMember[]
+//   start_date       DateTime
+//   due_date         DateTime
+//   create_at        DateTime     @default(now())
+//   update_at        DateTime     @updatedAt
+// }
 
-  @@id([role_name, permission_name])
-}
+// model PlanMember {
+//   user_id String
+//   plan_id String
+//   user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+//   plan    Plan   @relation(fields: [plan_id], references: [id], onDelete: Cascade)
 
-model Permission {
-  permission_name String           @id
-  created_at      DateTime         @default(now())
-  role_permission RolePermission[]
-}
+//   @@id([user_id, plan_id])
+// }
+
+// model PlanRole {
+//   id              String   @id @default(uuid())
+//   plan_id         String
+//   plan_role_name  String
+//   plan_permission String[]
+//   create_at       DateTime @default(now())
+//   update_at       DateTime @updatedAt
+// }
