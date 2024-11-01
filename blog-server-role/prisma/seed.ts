@@ -210,24 +210,14 @@ async function createPlan() {
 
     await prisma.planMembers.createMany({
       data: [
-        { plan_id: plant.id, user_id: member1!.id, plan_role_id: planRole2.id },
-        { plan_id: plant.id, user_id: member2!.id, plan_role_id: planRole2.id },
+        { plan_id: plant.id, user_id: member1!.id },
+        { plan_id: plant.id, user_id: member2!.id },
       ],
     });
   }
 }
 
-// initDB()
-//   .then(async () => {
-//     await prisma.$disconnect();
-//   })
-//   .catch(async (e) => {
-//     console.error(e);
-//     await prisma.$disconnect();
-//     process.exit(1);
-//   });
-
-createPlan()
+initDB()
   .then(async () => {
     await prisma.$disconnect();
   })
@@ -236,3 +226,13 @@ createPlan()
     await prisma.$disconnect();
     process.exit(1);
   });
+
+// createPlan()
+//   .then(async () => {
+//     await prisma.$disconnect();
+//   })
+//   .catch(async (e) => {
+//     console.error(e);
+//     await prisma.$disconnect();
+//     process.exit(1);
+//   });

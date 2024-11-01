@@ -35,13 +35,15 @@ model Users {
   username                   String
   gender                     Gender?
   picture                    String?
+  birth_date                 DateTime?
   phone_number               String?
   created_at                 DateTime         @default(now())
   updated_at                 DateTime         @updatedAt
-  oauth_provider             OauthProviders[]
-  mfa                        MFA[]
+  oauth_providers            OauthProviders[]
   plans                      Plans[]
   planMember                 PlanMembers[]
+  UsersPlanRoles             UsersPlanRoles[]
+  mfa                        MFA?
 }
 
 model OauthProviders {
@@ -58,7 +60,7 @@ model OauthProviders {
 
 model MFA {
   secret_key        String
-  last_access       DateTime
+  last_access       DateTime @updatedAt
   backup_code       String[]
   backup_codes_used String[] @default([])
   user_id           String
@@ -87,7 +89,6 @@ model Roles {
   user_role  UsersRoles[]
   created_at DateTime     @default(now())
   updated_at DateTime     @updatedAt
-  userId     String?
 }
 
 model Plans {
@@ -105,23 +106,30 @@ model Plans {
 }
 
 model PlanMembers {
-  user_id      String
-  plan_id      String
-  plan_role_id String
-  plan_role    PlanRoles @relation(fields: [plan_role_id], references: [id], onDelete: Cascade)
-  user         Users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  plan         Plans     @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  user_id String
+  plan_id String
+  user    Users  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  plan    Plans  @relation(fields: [plan_id], references: [id], onDelete: Cascade)
 
-  @@id([plan_id, user_id, plan_role_id])
+  @@id([plan_id, user_id])
 }
 
 model PlanRoles {
-  id              String        @id @default(uuid())
+  id              String           @id @default(uuid())
   plan_id         String
-  plan            Plans         @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  plan            Plans            @relation(fields: [plan_id], references: [id], onDelete: Cascade)
   plan_role_name  String
   plan_permission String[]
-  create_at       DateTime      @default(now())
-  update_at       DateTime      @updatedAt
-  PlanMembers     PlanMembers[]
+  create_at       DateTime         @default(now())
+  update_at       DateTime         @updatedAt
+  UsersPlanRoles  UsersPlanRoles[]
+}
+
+model UsersPlanRoles {
+  user_id      String
+  plan_role_id String
+  user         Users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  plan_role    PlanRoles @relation(fields: [plan_role_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, plan_role_id])
 }
