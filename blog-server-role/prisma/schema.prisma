@@ -42,8 +42,10 @@ model Users {
   oauth_providers            OauthProviders[]
   plans                      Plans[]
   planMember                 PlanMembers[]
-  UsersPlanRoles             UsersPlanRoles[]
+  users_plan_roles           UsersPlanRoles[]
   mfa                        MFA?
+  Task                       Task[]
+  TaskAssignees              TaskAssignees[]
 }
 
 model OauthProviders {
@@ -108,21 +110,23 @@ model Plans {
 model PlanMembers {
   user_id String
   plan_id String
-  user    Users  @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  plan    Plans  @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  user    Users   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  plan    Plans   @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  Task    Tasks?  @relation(fields: [taskId], references: [id])
+  taskId  String?
 
   @@id([plan_id, user_id])
 }
 
 model PlanRoles {
-  id              String           @id @default(uuid())
-  plan_id         String
-  plan            Plans            @relation(fields: [plan_id], references: [id], onDelete: Cascade)
-  plan_role_name  String
-  plan_permission String[]
-  create_at       DateTime         @default(now())
-  update_at       DateTime         @updatedAt
-  UsersPlanRoles  UsersPlanRoles[]
+  id                   String           @id @default(uuid())
+  plan_id              String
+  plan                 Plans            @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  plan_role_name       String
+  plan_permission      String[]
+  create_at            DateTime         @default(now())
+  update_at            DateTime         @updatedAt
+  users_has_plan_roles UsersPlanRoles[]
 }
 
 model UsersPlanRoles {
@@ -132,4 +136,111 @@ model UsersPlanRoles {
   plan_role    PlanRoles @relation(fields: [plan_role_id], references: [id], onDelete: Cascade)
 
   @@id([user_id, plan_role_id])
+}
+
+enum TaskStatus {
+  TO_DO
+  ON_PROGRESS
+  IN_REVIEW
+  COMPLETED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  URGENT
+}
+
+model TaskAssignees {
+  user_id    String
+  user       Users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  task_id    String
+  task       Tasks    @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  created_at DateTime @default(now())
+
+  @@id([task_id, user_id])
+}
+
+model TaskLabels {
+  name                String              @unique
+  created_at          DateTime            @default(now())
+  task_to_task_labels TasksToTaskLabels[]
+
+  @@id([name])
+  @@index([name])
+}
+
+model TasksToTaskLabels {
+  taskId  String
+  task    Tasks      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tagName String
+  tag     TaskLabels @relation(fields: [tagName], references: [name], onDelete: Cascade)
+
+  @@id([taskId, tagName])
+  @@index([taskId, tagName])
+}
+
+model Tasks {
+  id                 String          @id @default(uuid())
+  name               String
+  description        String
+  status             TaskStatus      @default(TO_DO)
+  tags               TaskToTag[]
+  start_date         DateTime
+  due_date           DateTime
+  priority           TaskPriority
+  created_by         Users           @relation(fields: [created_by_id], references: [id], onDelete: Cascade)
+  created_by_id      String
+  subTasks           SubTasks[]
+  task_assignees     TaskAssignees[]
+  disable_attachment Boolean
+  closeTask          Boolean         @default(false)
+  created_at         DateTime        @default(now())
+  updated_at         DateTime        @updatedAt
+  task_submit        TaskSubmit[]
+  plan_members       PlanMembers[]
+
+  @@index([name, status, startDate, dueDate, priority, createdById])
+}
+
+model SubTasks {
+  id                String       @id @default(uuid())
+  subTaskName       String       @default("")
+  disableAttachment Boolean      @default(true)
+  parentTask        Task         @relation(fields: [parentTaskId], references: [id], onDelete: Cascade)
+  parentTaskId      String
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  taskSubmit        TaskSubmit[]
+
+  @@index([subTaskName, parentTaskId])
+}
+
+enum TaskSubmitStatus {
+  ASSIGNED
+  ACCEPTED
+  REJECTED
+}
+
+model TaskSubmit {
+  id           String           @id @default(uuid())
+  taskId       String
+  task         Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  subTask      SubTask?         @relation(fields: [subTaskId], references: [id], onDelete: Cascade)
+  subTaskId    String?
+  status       TaskSubmitStatus @default(ASSIGNED)
+  attachments  String[]         @default([])
+  comments     String           @default("")
+  taskSubmitAt DateTime         @default(now())
+
+  @@index([taskId, subTaskId, status, taskSubmitAt])
+}
+
+model TaskAttachment {
+  id       String @id @default(uuid())
+  fileName String
+  type     String
+  url      String
+
+  @@index([fileName, url, type])
 }

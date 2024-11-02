@@ -135,6 +135,16 @@ export type User = {
       updated_at: Date;
     };
   }[];
+  users_plan_roles: {
+    plan_role: {
+      plan_id: string;
+      plan_role_name: string;
+      plan_permission: string[];
+
+      create_at: Date;
+      update_at: Date;
+    };
+  }[];
   status: UserStatus;
   password: string | null;
   username: string;

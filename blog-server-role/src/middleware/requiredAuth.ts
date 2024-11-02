@@ -16,7 +16,7 @@ export const authMiddleware =
       ...props,
     };
 
-    if (newProps.emailVerified && !req.user.emailVerified) {
+    if (newProps.emailVerified && !req.user.email_verified) {
       throw new PermissionError("Tài khoản của bạn chưa xác thực");
     }
 
@@ -30,3 +30,7 @@ export const authMiddleware =
     }
     return next();
   };
+
+export const checkPlanRoleMiddleware =
+  (planRole: string[]): Middleware =>
+  (req, res, next) => {};

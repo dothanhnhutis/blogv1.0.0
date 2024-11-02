@@ -34,6 +34,19 @@ export const userSelectDefault = {
       },
     },
   },
+  users_plan_roles: {
+    select: {
+      plan_role: {
+        select: {
+          plan_id: true,
+          plan_role_name: true,
+          plan_permission: true,
+          create_at: true,
+          update_at: true,
+        },
+      },
+    },
+  },
   status: true,
   password: true,
   username: true,
